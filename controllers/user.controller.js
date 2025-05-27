@@ -1,0 +1,338 @@
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const { OAuth2Client } = require("google-auth-library");
+const User = require("../models/user.model");
+const crypto = require("crypto");
+const { sendEmail } = require("../services/mail.service");
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Login or Register (Apple or Email)
+exports.loginOrRegister = async (req, res) => {
+  const { appleId, email, name, phone, surname } = req.body;
+
+  try {
+    let user = await User.findOne({
+      $or: [{ email }, { appleId }],
+      deleted: false,
+    });
+
+    if (user) {
+      if (appleId && user.appleId !== appleId) {
+        user.appleId = appleId;
+        await user.save();
+      }
+    } else {
+      let softDeletedUser = await User.findOne({ email, deleted: true });
+
+      if (softDeletedUser) {
+        softDeletedUser.deleted = false;
+        softDeletedUser.deletedAt = null;
+        if (appleId && softDeletedUser.appleId !== appleId) {
+          softDeletedUser.appleId = appleId;
+        }
+        user = await softDeletedUser.save();
+      } else {
+        user = await User.create({
+          appleId,
+          email,
+          name,
+          phone,
+          surname,
+        });
+      }
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, appleId: user.appleId },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).json({
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        surname: user.surname,
+        email: user.email,
+        phone: user.phone,
+        appleId: user.appleId,
+      },
+    });
+  } catch (error) {
+    console.error("Login/Register error:", error);
+    res.status(500).json({ error: "Failed to process request" });
+  }
+};
+
+// Admin Register
+exports.adminRegister = async (req, res) => {
+  const { email, password, name } = req.body;
+
+  try {
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ error: "Email already in use" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: "admin",
+    });
+
+    res.status(201).json({
+      message: "Admin registered successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("Admin registration error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Admin Login
+exports.adminLogin = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user || user.role !== "admin") {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("Admin login error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Google Register/Login
+exports.googleAuth = async (req, res) => {
+  const { credential } = req.body;
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, sub, picture } = payload;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        email,
+        name,
+        authSource: "google",
+        profilePicture: picture,
+      });
+    }
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        profilePicture: user.profilePicture,
+      },
+    });
+  } catch (error) {
+    console.error("Google Auth error:", error);
+    res.status(400).json({ error: "Google authentication failed" });
+  }
+};
+
+// Update User
+exports.updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { name, email, surname, phone } = req.body;
+
+  try {
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.name = name || user.name;
+    user.email = email || user.email;
+    user.surname = surname || user.surname;
+    user.phone = phone || user.phone;
+
+    await user.save();
+
+    res.status(200).json({
+      message: "User updated successfully",
+      user: {
+        _id: user._id,
+        name: user.name,
+        surname: user.surname,
+        email: user.email,
+        phone: user.phone,
+      },
+    });
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+};
+
+// Soft Delete User
+exports.softDeleteUser = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.deleted = true;
+    user.deletedAt = new Date();
+    await user.save();
+
+    res.status(200).json({ message: "User soft-deleted successfully" });
+  } catch (error) {
+    console.error("Soft delete error:", error);
+    res.status(500).json({ error: "Failed to delete user" });
+  }
+};
+
+// Permanently Delete User
+exports.hardDeleteUser = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    await User.findByIdAndDelete(id);
+    res.status(200).json({ message: "User deleted permanently" });
+  } catch (error) {
+    console.error("Hard delete error:", error);
+    res.status(500).json({ error: "Failed to delete user" });
+  }
+};
+
+// Get All Users (excluding deleted)
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({ deleted: false });
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Fetch users error:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+};
+
+// Get User by ID
+exports.getUserDetails = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Fetch user details error:", error);
+    res.status(500).json({ error: "Failed to fetch user details" });
+  }
+};
+
+exports.sendResetPasswordEmail = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email, deleted: false });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const tokenExpiry = Date.now() + 1000 * 60 * 60; // 1 hour
+
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = new Date(tokenExpiry);
+    await user.save();
+
+    const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${token}&email=${email}`;
+
+    await sendEmail({
+      to: email,
+      subject: "Password Reset Request",
+      html: `
+        <p>Hello ${user.name},</p>
+        <p>You requested to reset your password. Click the link below to proceed:</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>This link will expire in 1 hour.</p>
+      `,
+    });
+
+    res.status(200).json({ message: "Password reset email sent" });
+  } catch (error) {
+    console.error("Send reset password email error:", error);
+    res.status(500).json({ error: "Failed to send reset email" });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const { email, token, newPassword } = req.body;
+
+  try {
+    const user = await User.findOne({
+      email,
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() },
+      deleted: false,
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired token" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ error: "Failed to reset password" });
+  }
+};

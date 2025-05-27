@@ -1,0 +1,70 @@
+const express = require("express");
+const router = express.Router();
+const userController = require("../controllers/user.controller");
+const { authenticateJWT } = require("../middlewares/auth.middleware");
+const { limitLoginAttempts } = require("../middlewares/rateLimiter.middleware");
+
+/**
+ * Apple Register/Login (Public Route)
+ */
+router.post("/auth/apple", limitLoginAttempts, userController.loginOrRegister);
+
+/**
+ * Google Register/Login (Public Route)
+ */
+router.post("/auth/google", userController.googleAuth);
+
+/**
+ * Admin Register (Public Route or can be protected if restricted)
+ */
+router.post("/auth/admin/register", userController.adminRegister);
+
+/**
+ * Admin Login (Public Route)
+ */
+router.post("/auth/admin/login", userController.adminLogin);
+
+/**
+ * Get All Users (Protected Route)
+ */
+router.get("/users", authenticateJWT, userController.getAllUsers);
+
+/**
+ * Get User Details by ID (Protected Route)
+ */
+router.get("/users/:id", authenticateJWT, userController.getUserDetails);
+
+/**
+ * Update User by ID (Protected Route)
+ */
+router.put("/users/:id", authenticateJWT, userController.updateUser);
+
+/**
+ * Soft Delete User by ID (Protected Route)
+ */
+router.delete("/users/:id", authenticateJWT, userController.softDeleteUser);
+
+/**
+ * Send reset password email (public)
+
+ */
+router.post(
+  "/auth/reset-password-request",
+  userController.sendResetPasswordEmail
+);
+
+/**
+ * Reset password (public)
+ */
+router.post("/auth/reset-password", userController.resetPassword);
+
+/**
+ * Hard Delete User by ID (Protected Route)
+ */
+router.delete(
+  "/users/:id/hard",
+  authenticateJWT,
+  userController.hardDeleteUser
+);
+
+module.exports = router;
