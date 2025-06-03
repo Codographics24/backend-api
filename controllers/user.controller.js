@@ -342,7 +342,11 @@ exports.verifyEmail = async (req, res) => {
   const { email, name } = req.body;
 
   try {
-    const existingUser = await User.findOne({ email, deleted: false });
+    const existingUser = await User.findOne({
+      email,
+      deleted: false,
+      isVerified: true,
+    });
     if (existingUser) {
       return res.status(400).json({ error: "Email already exists" });
     }
@@ -353,12 +357,12 @@ exports.verifyEmail = async (req, res) => {
     await sendEmail({
       to: email,
       subject: "Your Verification Code",
-      html: `<p>Hello ${name || "User"},</p>
+      html: `
              <p>Your verification code is: <b>${otp}</b></p>
              <p>This code will expire in 10 minutes.</p>`,
     });
 
-    let user = await User.findOne({ email, deleted: true });
+    let user = await User.findOne({ email, deleted: true, isVerified: false });
     if (user) {
       user.otp = otp;
       user.otpExpires = otpExpires;
