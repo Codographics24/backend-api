@@ -22,10 +22,13 @@ const userSchema = new Schema(
       minlength: 2,
       maxlength: 50,
     },
-    surname: {
+    username: {
       type: String,
       trim: true,
       maxlength: 50,
+      unique: true,
+      lowercase: true,
+      trim: true,
     },
     phone: {
       type: String,
@@ -50,6 +53,17 @@ const userSchema = new Schema(
       type: String,
       enum: ["user", "admin", "moderator"],
       default: "user",
+    },
+    otp: {
+      type: String,
+      select: false,
+    },
+    otpExpires: {
+      type: Date,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
     },
 
     // Soft delete fields

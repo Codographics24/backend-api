@@ -9,7 +9,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Login or Register (Apple or Email)
 exports.loginOrRegister = async (req, res) => {
-  const { appleId, email, name, phone, surname } = req.body;
+  const { appleId, email, name, phone, username } = req.body;
 
   try {
     let user = await User.findOne({
@@ -38,7 +38,7 @@ exports.loginOrRegister = async (req, res) => {
           email,
           name,
           phone,
-          surname,
+          username,
         });
       }
     }
@@ -54,7 +54,7 @@ exports.loginOrRegister = async (req, res) => {
       user: {
         _id: user._id,
         name: user.name,
-        surname: user.surname,
+        username: user.username,
         email: user.email,
         phone: user.phone,
         appleId: user.appleId,
@@ -183,7 +183,7 @@ exports.googleAuth = async (req, res) => {
 // Update User
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
-  const { name, email, surname, phone } = req.body;
+  const { name, email, username, phone } = req.body;
 
   try {
     const user = await User.findById(id);
@@ -191,7 +191,7 @@ exports.updateUser = async (req, res) => {
 
     user.name = name || user.name;
     user.email = email || user.email;
-    user.surname = surname || user.surname;
+    user.username = username || user.username;
     user.phone = phone || user.phone;
 
     await user.save();
@@ -201,7 +201,7 @@ exports.updateUser = async (req, res) => {
       user: {
         _id: user._id,
         name: user.name,
-        surname: user.surname,
+        username: user.username,
         email: user.email,
         phone: user.phone,
       },
@@ -334,5 +334,124 @@ exports.resetPassword = async (req, res) => {
   } catch (error) {
     console.error("Reset password error:", error);
     res.status(500).json({ error: "Failed to reset password" });
+  }
+};
+
+// Step 1: Verify Email & Send OTP
+exports.verifyEmail = async (req, res) => {
+  const { email, name } = req.body;
+
+  try {
+    const existingUser = await User.findOne({ email, deleted: false });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await sendEmail({
+      to: email,
+      subject: "Your Verification Code",
+      html: `<p>Hello ${name || "User"},</p>
+             <p>Your verification code is: <b>${otp}</b></p>
+             <p>This code will expire in 10 minutes.</p>`,
+    });
+
+    let user = await User.findOne({ email, deleted: true });
+    if (user) {
+      user.otp = otp;
+      user.otpExpires = otpExpires;
+      user.deleted = false;
+      user.deletedAt = null;
+      await user.save();
+    } else {
+      user = await User.create({
+        email,
+        name: name || "Unknown",
+        otp,
+        otpExpires,
+        isVerified: false,
+        authSource: "self",
+      });
+    }
+
+    return res.status(200).json({ message: "Verification code sent" });
+  } catch (error) {
+    console.error("Verify email error:", error);
+    return res.status(500).json({ error: "Failed to send verification code" });
+  }
+};
+
+// Step 2: Verify OTP and Mark as Verified
+exports.verifyOtpCode = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    const user = await User.findOne({ email, deleted: false }).select(
+      "+otp +otpExpires"
+    );
+
+    if (!user || user.otp !== otp || user.otpExpires < new Date()) {
+      return res.status(400).json({ error: "Invalid or expired OTP" });
+    }
+
+    user.isVerified = true;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    return res.status(200).json({
+      message: "User verified successfully",
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error("OTP verification error:", error);
+    return res.status(500).json({ error: "OTP verification failed" });
+  }
+};
+
+// Step 3: Login With Email/Password
+exports.loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = await User.findOne({ email, deleted: false }).select(
+      "+password"
+    );
+
+    if (!user || !user.password) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error("Login user error:", error);
+    res.status(500).json({ error: "Login failed" });
   }
 };

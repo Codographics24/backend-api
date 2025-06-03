@@ -25,6 +25,34 @@ router.post("/auth/admin/register", userController.adminRegister);
 router.post("/auth/admin/login", userController.adminLogin);
 
 /**
+ * Email Verification - Step 1: Send OTP (Public Route)
+ */
+router.post("/auth/verify-email", userController.verifyEmail);
+
+/**
+ * Email Verification - Step 2: Verify OTP (Public Route)
+ */
+router.post("/auth/verify-code", userController.verifyOtpCode);
+
+/**
+ * Email/Password Login (Public Route)
+ */
+router.post("/auth/login", userController.loginUser);
+
+/**
+ * Send reset password email (Public Route)
+ */
+router.post(
+  "/auth/reset-password-request",
+  userController.sendResetPasswordEmail
+);
+
+/**
+ * Reset password (Public Route)
+ */
+router.post("/auth/reset-password", userController.resetPassword);
+
+/**
  * Get All Users (Protected Route)
  */
 router.get("/users", authenticateJWT, userController.getAllUsers);
@@ -43,20 +71,6 @@ router.put("/users/:id", authenticateJWT, userController.updateUser);
  * Soft Delete User by ID (Protected Route)
  */
 router.delete("/users/:id", authenticateJWT, userController.softDeleteUser);
-
-/**
- * Send reset password email (public)
-
- */
-router.post(
-  "/auth/reset-password-request",
-  userController.sendResetPasswordEmail
-);
-
-/**
- * Reset password (public)
- */
-router.post("/auth/reset-password", userController.resetPassword);
 
 /**
  * Hard Delete User by ID (Protected Route)
