@@ -27,6 +27,9 @@ const userSchema = new Schema(
       unique: true,
       sparse: true,
       lowercase: true,
+      default: function () {
+        return this.email.split("@")[0]; // Default username from email prefix
+      },
     },
     phone: {
       type: String,
