@@ -420,6 +420,43 @@ exports.verifyOtpCode = async (req, res) => {
   }
 };
 
+// Continue Signup (complete registration with name, username, password)
+exports.continueSignup = async (req, res) => {
+  const { id } = req.params;
+  const { name, username, password } = req.body;
+
+  if (!name || !username || !password) {
+    return res
+      .status(400)
+      .json({ error: "Name, username, and password are required" });
+  }
+
+  try {
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Update fields
+    user.name = name;
+    user.username = username;
+    user.password = await bcrypt.hash(password, 10); // hash new password
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Signup completed successfully",
+      user: {
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Continue signup error:", error);
+    res.status(500).json({ error: "Failed to complete signup" });
+  }
+};
+
 // Step 3: Login With Email/Password
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
@@ -457,5 +494,33 @@ exports.loginUser = async (req, res) => {
   } catch (error) {
     console.error("Login user error:", error);
     res.status(500).json({ error: "Login failed" });
+  }
+};
+
+// Check if username exists
+exports.checkUsernameExists = async (req, res) => {
+  const { username } = req.query;
+
+  if (!username) {
+    return res.status(400).json({ error: "Username is required" });
+  }
+
+  try {
+    const user = await User.findOne({
+      username: username.toLowerCase().trim(),
+    });
+
+    if (user) {
+      return res
+        .status(200)
+        .json({ exists: true, message: "Username already taken" });
+    } else {
+      return res
+        .status(200)
+        .json({ exists: false, message: "Username is available" });
+    }
+  } catch (error) {
+    console.error("Username check error:", error);
+    res.status(500).json({ error: "Failed to check username" });
   }
 };

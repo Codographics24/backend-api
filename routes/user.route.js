@@ -35,6 +35,16 @@ router.post("/auth/verify-email", userController.verifyEmail);
 router.post("/auth/verify-code", userController.verifyOtpCode);
 
 /**
+ * Continue Signup - Complete Registration with Name, Username, and Password
+ */
+router.post("/auth/continue-signup/:id", userController.continueSignup);
+
+/**
+ * Check if Username Exists (Public)
+ */
+router.get("/auth/check-username", userController.checkUsernameExists);
+
+/**
  * Email/Password Login (Public Route)
  */
 router.post("/auth/login", userController.loginUser);
