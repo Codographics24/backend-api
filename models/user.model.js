@@ -17,9 +17,7 @@ const userSchema = new Schema(
     },
     name: {
       type: String,
-
       trim: true,
-      minlength: 2,
       maxlength: 50,
     },
     username: {
@@ -29,7 +27,6 @@ const userSchema = new Schema(
       unique: true,
       sparse: true,
       lowercase: true,
-      trim: true,
     },
     phone: {
       type: String,
@@ -38,8 +35,7 @@ const userSchema = new Schema(
     },
     password: {
       type: String,
-      select: false, // exclude from queries by default
-      minlength: 8,
+      select: false,
     },
     authSource: {
       type: String,
