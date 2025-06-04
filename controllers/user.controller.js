@@ -372,7 +372,7 @@ exports.verifyEmail = async (req, res) => {
     } else {
       user = await User.create({
         email,
-        name: name || "Unknown",
+        name: name,
         otp,
         otpExpires,
         isVerified: false,
