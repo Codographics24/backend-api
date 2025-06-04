@@ -100,9 +100,4 @@ userSchema.pre(/^find/, function (next) {
   next();
 });
 
-// 📌 Indexes
-userSchema.index({ email: 1 }); // Already unique, but explicit
-userSchema.index({ phone: 1 });
-userSchema.index({ deleted: 1 });
-
 module.exports = mongoose.model("User", userSchema);
