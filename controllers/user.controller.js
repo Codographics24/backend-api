@@ -435,20 +435,43 @@ exports.continueSignup = async (req, res) => {
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    // Check if username is already taken by another user
+    const existingUsername = await User.findOne({
+      username: username.toLowerCase(),
+      _id: { $ne: id },
+    });
+    if (existingUsername) {
+      return res.status(409).json({ error: "Username already taken" });
+    }
+
     // Update fields
     user.name = name;
-    user.username = username;
-    user.password = await bcrypt.hash(password, 10); // hash new password
+    user.username = username.toLowerCase();
+    user.password = await bcrypt.hash(password, 10); // Hash the password
 
     await user.save();
 
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
     res.status(200).json({
-      message: "Signup completed successfully",
+      message: "Signup completed and logged in successfully",
+      token,
       user: {
         _id: user._id,
         name: user.name,
         username: user.username,
         email: user.email,
+        role: user.role,
+        status: user.status,
       },
     });
   } catch (error) {
