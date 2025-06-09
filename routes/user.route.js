@@ -50,7 +50,7 @@ router.get("/auth/check-username", userController.checkUsernameExists);
 router.post("/auth/login", userController.loginUser);
 
 /**
- * Send reset password email (Public Route)
+ * Password Reset - Step 1: Send OTP to Email (Public)
  */
 router.post(
   "/auth/reset-password-request",
@@ -58,7 +58,12 @@ router.post(
 );
 
 /**
- * Reset password (Public Route)
+ * Password Reset - Step 2: Verify OTP (Public)
+ */
+router.post("/auth/verify-otp", userController.verifyOtp); // ✅ Newly added route
+
+/**
+ * Password Reset - Step 3: Set New Password (Public)
  */
 router.post("/auth/reset-password", userController.resetPassword);
 
