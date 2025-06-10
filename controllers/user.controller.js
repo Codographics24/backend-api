@@ -523,6 +523,9 @@ exports.verifyOtp = async (req, res) => {
 
   try {
     const user = await User.findOne({ email: email.toLowerCase() });
+
+    console.log("User found:", user);
+
     if (!user || !user.resetOtp || !user.resetOtpExpiry) {
       return res.status(400).json({ error: "Invalid OTP or email" });
     }
