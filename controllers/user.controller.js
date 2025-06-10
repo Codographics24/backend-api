@@ -522,7 +522,10 @@ exports.verifyOtp = async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      deleted: false,
+    }).select("+resetOtp +resetOtpExpiry");
 
     console.log("User found:", user);
 
