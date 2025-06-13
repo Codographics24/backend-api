@@ -8,10 +8,13 @@ require("dotenv").config(); // Load environment variables
 require("./config/db.config"); // MongoDB connection config
 const userRoutes = require("./routes/user.route");
 const formRoutes = require("./routes/form.routes");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app); // Create HTTP server
 const PORT = process.env.PORT || 5000;
+
+app.use(express.static(path.join(__dirname, "public")));
 
 // Initialize Socket.IO with CORS settings
 const io = new Server(server, {
