@@ -8,6 +8,7 @@ require("dotenv").config(); // Load environment variables
 require("./config/db.config"); // MongoDB connection config
 const userRoutes = require("./routes/user.route");
 const formRoutes = require("./routes/form.routes");
+const reminderRoutes = require("./routes/reminder.route");
 const path = require("path");
 
 const app = express();
@@ -39,6 +40,7 @@ app.use(bodyParser.json());
 // Routes
 app.use("/api", userRoutes);
 app.use("/api", formRoutes);
+app.use("/api", reminderRoutes);
 
 // Socket.IO integration
 io.on("connection", (socket) => {
