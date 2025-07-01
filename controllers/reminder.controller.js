@@ -12,9 +12,10 @@ exports.createReminder = async (req, res) => {
     reminderType,
     frequency,
     priority,
-    userId,
     fcmToken,
   } = req.body;
+
+  const userId = req.user?.userId;
 
   if (!title || !date || !reminderType || !frequency || !userId || !fcmToken) {
     return res.status(400).json({
@@ -33,7 +34,7 @@ exports.createReminder = async (req, res) => {
       userId,
     });
 
-    // Schedule notification based on frequency
+    // Schedule notification
     scheduleReminder({ title, date, frequency, reminderType, fcmToken });
 
     res.status(201).json({
@@ -46,13 +47,12 @@ exports.createReminder = async (req, res) => {
   }
 };
 
-// Get all reminders for a user
+// Get all reminders for the authenticated user
 exports.getRemindersByUser = async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.user?.userId;
 
   try {
     const reminders = await Reminder.find({ userId }).sort({ date: 1 });
-
     res.status(200).json(reminders);
   } catch (error) {
     console.error("Get reminders error:", error);
@@ -63,15 +63,19 @@ exports.getRemindersByUser = async (req, res) => {
 // Update a reminder by ID
 exports.updateReminder = async (req, res) => {
   const { id } = req.params;
+  const userId = req.user?.userId;
 
   try {
-    const updated = await Reminder.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const updated = await Reminder.findOneAndUpdate(
+      { _id: id, userId },
+      req.body,
+      { new: true, runValidators: true }
+    );
 
     if (!updated) {
-      return res.status(404).json({ error: "Reminder not found" });
+      return res
+        .status(404)
+        .json({ error: "Reminder not found or unauthorized" });
     }
 
     res.status(200).json({
@@ -87,12 +91,15 @@ exports.updateReminder = async (req, res) => {
 // Delete a reminder by ID
 exports.deleteReminder = async (req, res) => {
   const { id } = req.params;
+  const userId = req.user?.userId;
 
   try {
-    const deleted = await Reminder.findByIdAndDelete(id);
+    const deleted = await Reminder.findOneAndDelete({ _id: id, userId });
 
     if (!deleted) {
-      return res.status(404).json({ error: "Reminder not found" });
+      return res
+        .status(404)
+        .json({ error: "Reminder not found or unauthorized" });
     }
 
     res.status(200).json({ message: "Reminder deleted successfully" });
