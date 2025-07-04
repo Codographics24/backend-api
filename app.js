@@ -9,6 +9,7 @@ require("./config/db.config"); // MongoDB connection config
 const userRoutes = require("./routes/user.route");
 const formRoutes = require("./routes/form.routes");
 const reminderRoutes = require("./routes/reminder.route");
+const goalRoutes = require("./routes/goal.route");
 const path = require("path");
 
 const app = express();
@@ -41,6 +42,7 @@ app.use(bodyParser.json());
 app.use("/api", userRoutes);
 app.use("/api", formRoutes);
 app.use("/api", reminderRoutes);
+app.use("/api", goalRoutes);
 
 // Socket.IO integration
 io.on("connection", (socket) => {
