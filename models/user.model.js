@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
+const deviceSchema = require("./device.model"); // Import device schema
 
 const userSchema = new Schema(
   {
@@ -28,13 +29,13 @@ const userSchema = new Schema(
       sparse: true,
       lowercase: true,
       default: function () {
-        return this.email.split("@")[0]; // Default username from email prefix
+        return this.email.split("@")[0];
       },
     },
     phone: {
       type: String,
       trim: true,
-      match: [/^\+?[1-9]\d{1,14}$/, "Invalid phone number"], // E.164 format
+      match: [/^\+?[1-9]\d{1,14}$/, "Invalid phone number"],
     },
     password: {
       type: String,
@@ -72,8 +73,6 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
-
-    // Soft delete fields
     deleted: {
       type: Boolean,
       default: false,
@@ -82,10 +81,21 @@ const userSchema = new Schema(
       type: Date,
       default: null,
     },
-  },
 
+    // New fields
+    country: {
+      type: String,
+      trim: true,
+      maxlength: 2,
+    },
+    timezone: {
+      type: String,
+      trim: true,
+    },
+    devices: [deviceSchema],
+  },
   {
-    timestamps: true, // createdAt & updatedAt
+    timestamps: true,
     toJSON: {
       virtuals: true,
       transform: function (doc, ret) {
@@ -98,7 +108,7 @@ const userSchema = new Schema(
   }
 );
 
-// 🔒 Automatically exclude soft-deleted users from queries
+// Soft-delete filter
 userSchema.pre(/^find/, function (next) {
   if (!this.getFilter().includeDeleted) {
     this.where({ deleted: false });

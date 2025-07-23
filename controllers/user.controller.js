@@ -183,16 +183,38 @@ exports.googleAuth = async (req, res) => {
 // Update User
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
-  const { name, email, username, phone } = req.body;
+  const { name, email, username, phone, country, timezone, device } = req.body;
 
   try {
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    // Update basic profile fields
     user.name = name || user.name;
     user.email = email || user.email;
     user.username = username || user.username;
     user.phone = phone || user.phone;
+    user.country = country || user.country;
+    user.timezone = timezone || user.timezone;
+
+    // Device update logic (optional)
+    if (device?.deviceName && device?.os) {
+      const existingDevice = user.devices.find(
+        (d) => d.deviceName === device.deviceName && d.os === device.os
+      );
+
+      if (existingDevice) {
+        // Update lastAccess if device already exists
+        existingDevice.lastAccess = new Date(device.lastAccess || Date.now());
+      } else {
+        // Add new device
+        user.devices.push({
+          deviceName: device.deviceName,
+          os: device.os,
+          lastAccess: device.lastAccess || new Date(),
+        });
+      }
+    }
 
     await user.save();
 
@@ -204,6 +226,9 @@ exports.updateUser = async (req, res) => {
         username: user.username,
         email: user.email,
         phone: user.phone,
+        country: user.country,
+        timezone: user.timezone,
+        devices: user.devices,
       },
     });
   } catch (error) {
@@ -263,7 +288,10 @@ exports.getUserDetails = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const user = await User.findById(id);
+    const user = await User.findById(id).populate(
+      "devices",
+      "-_id deviceName os lastAccess"
+    );
     if (!user) return res.status(404).json({ error: "User not found" });
 
     res.status(200).json(user);
