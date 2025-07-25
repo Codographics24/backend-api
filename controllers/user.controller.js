@@ -311,8 +311,13 @@ exports.verifyEmail = async (req, res) => {
       deleted: false,
       isVerified: true,
     });
+
     if (existingUser) {
-      return res.status(400).json({ error: "Email already exists" });
+      const profileComplete = !!existingUser.username;
+      return res.status(400).json({
+        error: "Email already exists",
+        profileComplete,
+      });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
