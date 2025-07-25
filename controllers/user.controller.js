@@ -313,7 +313,7 @@ exports.verifyEmail = async (req, res) => {
     });
 
     if (existingUser) {
-      const profileComplete = !!existingUser.username;
+      const profileComplete = !!existingUser.name;
       return res.status(400).json({
         error: "Email already exists",
         profileComplete,
